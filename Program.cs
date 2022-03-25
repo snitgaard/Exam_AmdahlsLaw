@@ -4,7 +4,6 @@ namespace Exam_AmdahlsLaw
 {
     class Program
     {
-        static int cores;
         static object counterlock = new object();
         static int first = 1;
         static int last = 100000;
@@ -12,17 +11,20 @@ namespace Exam_AmdahlsLaw
         static void Main(string[] args)
         {
             var stopwatch = new Stopwatch();
-            GetCores(); 
+            var cores = GetDegreesOfParallelism();
+            var sequentialWorkLoad = new List<Action> { PrimeCalculator, PrimeCalculator };
+            var parallelizableWorkLoad = new List<Action> { PrimeCalculator, PrimeCalculator, PrimeCalculator, PrimeCalculator, PrimeCalculator, PrimeCalculator };
+
             stopwatch.Start();
-            for (int i = first; i <= last; i++)  
+            foreach(var sequentialWork in sequentialWorkLoad)
             {
-                PrimeCalculator(i);
-            }    
+                sequentialWork();
+            }
             var s1 = stopwatch.ElapsedMilliseconds;
 
-            for (int i = first; i <= last + 100000; i++)
+            foreach(var notParallelWork in parallelizableWorkLoad)
             {
-                PrimeCalculator(i);
+                notParallelWork();
             }
             stopwatch.Stop();
             var s2 = stopwatch.ElapsedMilliseconds - s1;
@@ -30,21 +32,21 @@ namespace Exam_AmdahlsLaw
             stopwatch.Reset();
 
             stopwatch.Start();
-            for (int i = first; i <= last; i++)
+            foreach (var sequentialWork in sequentialWorkLoad)
             {
-                PrimeCalculator(i);
+                sequentialWork();
             }
 
             var p1 = stopwatch.ElapsedMilliseconds;
 
-            Parallel.For(first, last + 100000, i =>
-            {
-                PrimeCalculator(i);
+            Parallel.ForEach(
+                parallelizableWorkLoad,
                 new ParallelOptions
                 {
                     MaxDegreeOfParallelism = cores
-                };
-            });
+                },
+                (workToDo) => workToDo());
+
             stopwatch.Stop();
             var p2 = stopwatch.ElapsedMilliseconds - p1;
 
@@ -58,84 +60,53 @@ namespace Exam_AmdahlsLaw
             Console.WriteLine("Press any key to exit");
         }
 
-        public static List<long> GetPrimesSequential(long first, long last)
-        {
-            List<long> list = new List<long>();
-            Console.WriteLine("Sequential calculation started...");
-
-            for (long i = first; i <= last; i++)
-            {
-                PrimeCalculator(i);
-            }
-            Console.WriteLine("Found: " + list.Count() + " prime numbers.");
-            return list;
-        }
-
-        private static int GetCores()
+        private static int GetDegreesOfParallelism()
         {
             var numberOfLogicalProcessors = Environment.ProcessorCount;
 
-            Console.Write("Enter the number of processor cores you want to use (1 to {0}, or press <enter> for {0}):",
+            // Get number of processors you want to use from user
+            Console.Write("Enter the number of processors you want to use (1 to {0}, or press <enter> for {0}):",
                           numberOfLogicalProcessors);
 
             var stringDegreeOfParallelism = Console.ReadLine();
+            int degreeOfParallelism;
 
             if (string.IsNullOrWhiteSpace(stringDegreeOfParallelism) ||
-                !int.TryParse(stringDegreeOfParallelism, out cores) ||
-                cores > numberOfLogicalProcessors)
+                !int.TryParse(stringDegreeOfParallelism, out degreeOfParallelism) ||
+                degreeOfParallelism > numberOfLogicalProcessors)
             {
-                cores = numberOfLogicalProcessors;
+                degreeOfParallelism = numberOfLogicalProcessors;
             }
 
-            return cores;
+            return degreeOfParallelism;
         }
 
-        public static void PrimeCalculator(long i)
+        public static void PrimeCalculator()
         {
             List<long> list = new List<long>();
             bool isPrime = true;
-            if (i > 1)
+            for(int i=first; i<last; i++)
             {
-                for (int j = 2; j < i; j++)
+                if (i > 1)
                 {
-                    if (i % j == 0)
+                    for (int j = 2; j < i; j++)
                     {
-                        isPrime = false;
-                        break;
+                        if (i % j == 0)
+                        {
+                            isPrime = false;
+                            break;
+                        }
                     }
-                }
-                if (isPrime == true)
-                {
-                    lock (counterlock)
+                    if (isPrime == true)
                     {
-                        list.Add(i);
+                        lock (counterlock)
+                        {
+                            list.Add(i);
+                        }
                     }
                 }
             }
-        }
-
-        public static void GetPrimesParallel(long first, long last)
-        {
-            List<long> list = new List<long>();
-            Console.WriteLine("Parallel calculation started...");
-
-            Parallel.For(first, last + 1, i =>
-            {
-                PrimeCalculator(i);
-                new ParallelOptions
-                {
-                    MaxDegreeOfParallelism = cores
-                };
-            });
-
-        }
-
-        private static void MeasureTime(Action ac)
-        {
-            Stopwatch sw = Stopwatch.StartNew();
-            ac.Invoke();
-            sw.Stop();
-            Console.WriteLine($"Time = {sw.Elapsed.TotalSeconds} seconds");
+           
         }
     }
 }
