@@ -17,7 +17,7 @@ namespace Exam_AmdahlsLaw
             for (int i = first; i <= last; i++)  
             {
                 PrimeCalculator(i);
-            }   
+            }    
             var s1 = stopwatch.ElapsedMilliseconds;
 
             for (int i = first; i <= last + 100000; i++)
